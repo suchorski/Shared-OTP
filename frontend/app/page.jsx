@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, Loader2 } from "lucide-react";
-import { api, setToken } from "@/lib/api";
+import { KeyRound, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
+import { API_BASE, api, setToken } from "@/lib/api";
 import { useAuth } from "./components/AuthProvider";
+
+const TRUST_FLAG = "otp_trust_attempted";
 
 function formatCpf(value) {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -21,6 +23,52 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [apiStatus, setApiStatus] = useState("checking");
+
+  const liberarCertificado = useCallback(() => {
+    try {
+      sessionStorage.setItem(TRUST_FLAG, "1");
+    } catch {
+      // Ignora indisponibilidade do sessionStorage.
+    }
+    const retorno = window.location.origin + window.location.pathname;
+    window.location.href = `${API_BASE}/trust?return=${encodeURIComponent(retorno)}`;
+  }, []);
+
+  useEffect(() => {
+    let cancelado = false;
+
+    (async () => {
+      try {
+        const response = await fetch(`${API_BASE}/health`, { cache: "no-store" });
+        if (cancelado) return;
+        if (response.ok) {
+          setApiStatus("online");
+          try {
+            sessionStorage.removeItem(TRUST_FLAG);
+          } catch {
+            // Ignora indisponibilidade do sessionStorage.
+          }
+          return;
+        }
+        setApiStatus("offline");
+      } catch {
+        if (cancelado) return;
+        setApiStatus("offline");
+        let jaTentou = false;
+        try {
+          jaTentou = sessionStorage.getItem(TRUST_FLAG) === "1";
+        } catch {
+          // Ignora indisponibilidade do sessionStorage.
+        }
+        if (!jaTentou) liberarCertificado();
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [liberarCertificado]);
 
   useEffect(() => {
     if (!loading && user) router.replace("/otps");
@@ -84,6 +132,35 @@ export default function LoginPage() {
             Entrar
           </button>
         </form>
+        <div className="mt-5 flex flex-col items-center gap-2 border-t border-gray-200 pt-4 text-xs">
+          {apiStatus === "checking" && (
+            <span className="flex items-center gap-1.5 text-gray-500">
+              <Loader2 size={14} className="animate-spin" />
+              Verificando conexão com o servidor...
+            </span>
+          )}
+          {apiStatus === "online" && (
+            <span className="flex items-center gap-1.5 text-green-700">
+              <ShieldCheck size={14} />
+              Servidor acessível
+            </span>
+          )}
+          {apiStatus === "offline" && (
+            <>
+              <span className="flex items-center gap-1.5 text-red-600">
+                <ShieldAlert size={14} />
+                Servidor inacessível
+              </span>
+              <button
+                type="button"
+                onClick={liberarCertificado}
+                className="font-semibold text-blue-800 underline hover:text-blue-950"
+              >
+                Liberar acesso seguro (aceitar certificado)
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

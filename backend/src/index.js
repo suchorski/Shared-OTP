@@ -30,6 +30,30 @@ app.use((_req, res, next) => {
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
+app.get("/trust", (req, res) => {
+  const defaultUrl = config.frontendOrigins[0] || "/";
+  let destination = defaultUrl;
+  const requestedReturn = req.query.return;
+
+  if (requestedReturn) {
+    try {
+      const requested = new URL(String(requestedReturn));
+      const allowed = config.frontendOrigins.some((origin) => {
+        try {
+          return requested.origin === new URL(origin).origin;
+        } catch {
+          return false;
+        }
+      });
+      if (allowed) destination = requested.toString();
+    } catch {
+      // Mantém o destino padrão quando o retorno não é uma URL válida.
+    }
+  }
+
+  res.redirect(302, destination);
+});
+
 app.use("/auth", authRoutes);
 app.use("/otps", requireAuth, otpRoutes);
 app.use("/users", requireAuth, userRoutes);

@@ -1,4 +1,4 @@
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://otp-api.pamals.intraer").replace(/\/+$/, "");
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://otp-api.pamals.intraer").replace(/\/+$/, "");
 const TOKEN_KEY = "otp_token";
 
 export const getToken = () => (typeof window === "undefined" ? null : localStorage.getItem(TOKEN_KEY));
