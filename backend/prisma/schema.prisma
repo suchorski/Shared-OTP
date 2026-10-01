@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  USER
+  ADMIN_LOCAL
+  ADMIN_GLOBAL
+}
+
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  OTP_CREATE
+  OTP_UPDATE
+  OTP_DELETE
+  OTP_SHARE
+  OTP_UNSHARE
+  OTP_TRANSFER
+  OTP_COPY
+  ADMIN_VIEW_CODE
+  ROLE_CHANGE
+}
+
+model User {
+  id          String    @id @default(cuid())
+  cpf         String    @unique @db.VarChar(11)
+  name        String?   @db.VarChar(255)
+  warName     String?   @db.VarChar(100)
+  saram       String?   @db.VarChar(20)
+  rank        String?   @db.VarChar(50)
+  om          String?   @db.VarChar(100)
+  email       String?   @db.VarChar(255)
+  role        Role      @default(USER)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  ownedOtps     Otp[]      @relation("OtpOwner")
+  shares        OtpShare[] @relation("ShareUser")
+  sharesGranted OtpShare[] @relation("ShareGrantedBy")
+  auditsAsActor AuditLog[] @relation("AuditActor")
+  auditsAsTarget AuditLog[] @relation("AuditTarget")
+
+  @@index([name])
+  @@index([warName])
+  @@index([saram])
+  @@index([om])
+  @@map("users")
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(100)
+  issuer    String?  @db.VarChar(100)
+  secretEnc String   @db.Text
+  algorithm String   @default("SHA1") @db.VarChar(10)
+  digits    Int      @default(6)
+  period    Int      @default(30)
+  ownerId   String
+  owner     User     @relation("OtpOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shares OtpShare[]
+
+  @@index([ownerId])
+  @@map("otps")
+}
+
+model OtpShare {
+  id         String   @id @default(cuid())
+  otpId      String
+  otp        Otp      @relation(fields: [otpId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation("ShareUser", fields: [userId], references: [id], onDelete: Cascade)
+  sharedById String?
+  sharedBy   User?    @relation("ShareGrantedBy", fields: [sharedById], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@unique([otpId, userId])
+  @@index([userId])
+  @@map("otp_shares")
+}
+
+// otpId/otpName/ownerOm/actorOm are snapshots so history survives deletions and OM changes.
+model AuditLog {
+  id           String      @id @default(cuid())
+  action       AuditAction
+  actorId      String?
+  actor        User?       @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorCpf     String?     @db.VarChar(11)
+  actorOm      String?     @db.VarChar(100)
+  otpId        String?
+  otpName      String?     @db.VarChar(100)
+  ownerOm      String?     @db.VarChar(100)
+  targetUserId String?
+  targetUser   User?       @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  ip           String?     @db.VarChar(64)
+  userAgent    String?     @db.VarChar(255)
+  details      Json?
+  createdAt    DateTime    @default(now())
+
+  @@index([otpId])
+  @@index([actorId])
+  @@index([targetUserId])
+  @@index([actorOm])
+  @@index([ownerOm])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

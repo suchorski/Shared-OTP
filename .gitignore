@@ -1,0 +1,21 @@
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build output and caches
+.next/
+out/
+dist/
+coverage/
+.turbo/
+.vercel/
+*.tsbuildinfo
+
+# Logs and local files
+*.log
+.npm/
+.DS_Store
